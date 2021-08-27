@@ -1,6 +1,9 @@
 #pragma once
 #include "Window.h"
+#include "resource.h"
 
+
+#define FAILED(Status) ((HRESULT)(Status)<0)
 Window::WindowClass Window::WindowClass::wndClass;
 
 Window::WindowClass::WindowClass() noexcept :hInst(GetModuleHandle(nullptr))
@@ -12,12 +15,12 @@ Window::WindowClass::WindowClass() noexcept :hInst(GetModuleHandle(nullptr))
 	wc.cbClsExtra = 0;//여분메모리량 건들필요없음
 	wc.cbWndExtra = 0;//여분메모리량 건들필요없음
 	wc.hInstance = GetInstance();//hWnd인스턴스
-	wc.hIcon = nullptr;//아이콘
+	wc.hIcon = static_cast<HICON>(LoadImage(hInst, MAKEINTRESOURCE(IDI_ICON1), IMAGE_ICON, 32, 32, 0));//LoadImage를한 후 HICON으로 캐스팅한다.
 	wc.hCursor = nullptr;//커서
 	wc.hbrBackground = nullptr;//백그라운드
 	wc.lpszMenuName = nullptr;//메뉴네임
 	wc.lpszClassName = GetName();//윈도우 창이름
-	wc.hIconSm = nullptr;
+	wc.hIconSm = static_cast<HICON>(LoadImage(hInst, MAKEINTRESOURCE(IDI_ICON1), IMAGE_ICON, 16, 16, 0));//LoadImage를한 후 HICON으로 캐스팅한다.
 	RegisterClassEx(&wc);
 }
 
@@ -46,22 +49,111 @@ Window::Window(int width, int height, const char* name) noexcept
 	//RECT구조체, 윈도우 스타일 매크로, 메뉴여부-->사용안함
 	AdjustWindowRect(&wr, WS_CAPTION | WS_MINIMIZEBOX | WS_SYSMENU, FALSE);
 	//CreateWindow-->
-	this->hWnd = CreateWindow(
+	hWnd = CreateWindow(
 		WindowClass::GetName(), name,
 		WS_CAPTION | WS_MINIMIZEBOX | WS_SYSMENU,
 		CW_USEDEFAULT, CW_USEDEFAULT, wr.right - wr.left, wr.bottom - wr.top,
 		nullptr, nullptr, WindowClass::GetInstance(), this);
+	ShowWindow(hWnd, SW_SHOWDEFAULT);
 }
 Window::~Window()
 {
-	DestroyWindow(this->hWnd);
+	DestroyWindow(hWnd);
 }
 
-LRESULT WINAPI Window::HandleMsgSetup(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) noexcept
+LRESULT WINAPI Window::HandleMsgSetup(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
 	//윈도우 창이 생성될때 WM_CREATE 가 불리기전 WM_NCCREATE가 불린다. 
-	if (msg == WM_NCCALCSIZE)
+	if (msg == WM_NCCREATE)
 	{
+		//reinterpret_cast --> lParam을 CREATESTRUCTW*로 강제 캐스팅
 		const CREATESTRUCTW* const pCreate = reinterpret_cast<CREATESTRUCTW*>(lParam);
+		//CREATESTCURTW 구조체 멤버에있는 lpCreateParams 를 Window*로 캐스팅해서 pWnd로 저장
+		Window* const pWnd = static_cast<Window*>(pCreate->lpCreateParams);
+		//setWindowLongPtr-->(윈도우 핸들, 설정변경상수, 설정 변경값)
+		//setWindowLongPtr-->WindowAPI의 값을 저장할수 있게 한다.
+		SetWindowLongPtr(hWnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(pWnd));
+		//윈도우 프로시저 Window::handleMsgThunk로 변경 
+		SetWindowLongPtr(hWnd, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(&Window::HandleMsgThunk));
+		return pWnd->HandleMsg(hWnd, msg, wParam, lParam);
 	}
+	//WM_NCCREATE메세지를 받기전에 메세지를 받았으면(윈도우가 생성되기 전에) DefWindowProc를 리턴
+	return DefWindowProc(hWnd, msg, wParam, lParam);
+}
+
+LRESULT WINAPI Window::HandleMsgThunk(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
+{
+	//윈도우 핸들 hWnd와, 가져오고싶은 값을 넣으면 WindowPtr로 돌려주고 Window*로 cast해서 pWnd에 저장
+	Window* const pWnd = reinterpret_cast<Window*>(GetWindowLongPtr(hWnd, GWLP_USERDATA));
+	//pWnd(Window*)의 HandleMsg메소드 값을 리턴
+	return pWnd->HandleMsg(hWnd, msg, wParam, lParam);
+}
+
+LRESULT Window::HandleMsg(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) noexcept
+{
+	switch (msg)//메세지가 들어오면
+	{
+	case WM_CLOSE://윈도우 창을 닫는 메세지가 들어온다면
+		PostQuitMessage(0);
+		return 0;
+	}
+	return DefWindowProc(hWnd, msg, wParam, lParam);
+}
+
+//Window Exception 클래스 
+
+Window::Exception::Exception(int line, const char* file, HRESULT hr) noexcept
+	:MyException(line, file),
+	hr(hr)//hr 즉 HRESULT가 결과를 담고있다
+{}
+
+const char* Window::Exception::what() const noexcept
+{
+	std::ostringstream oss;
+	oss << GetType() << std::endl
+		<< "[Error Code]" << GetErrorCode() << std::endl
+		<< "[Description]" << GetErrorString() << std::endl
+		<< GetOriginString();
+	whatBuffer = oss.str();
+	return whatBuffer.c_str();
+}
+
+std::string Window::Exception::TraslateErrorCode(HRESULT hr) noexcept//여기서 HRESULT에대한 번역을 담당한다.
+{
+	char* pMsgBuf = nullptr;//메세지버퍼
+
+	DWORD nMsgLen = FormatMessage(
+		FORMAT_MESSAGE_ALLOCATE_BUFFER |//메세지의 메모리를 시스템에서 할당
+		FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,//운영체제로부터 오류를 가져옴, 입력무시
+		nullptr, 
+		hr, //에러번호-->HRESULT
+		MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),//메세지의 언어 LANG_NEUTRAL, SUBLANG_DEFAULT로 정한경우에는 제어판에서 설정한 한국어가 나온다.
+		reinterpret_cast<LPSTR>(&pMsgBuf),//에러를 담을 버퍼 char* 를 LPSTR로 캐스팅했다
+		0, 
+		nullptr
+	);
+
+	if (nMsgLen == 0)
+	{
+		return "Unidentified error code";
+	}
+
+	std::string errorString = pMsgBuf;
+	LocalFree(pMsgBuf);
+	return errorString;
+}
+
+const char* Window::Exception::GetType() const noexcept
+{
+	return "Window Exception";
+}
+
+HRESULT Window::Exception::GetErrorCode() const noexcept
+{
+	return Exception::hr;//여기서 raw로 된 HRESULT를 반환하고, what에서 이를 출력한다.
+}
+
+std::string Window::Exception::GetErrorString() const noexcept
+{
+	return TraslateErrorCode(Exception::hr);//여기서 Translate된 HRESULT를 반환하고, what에서 이를 출력한다.
 }

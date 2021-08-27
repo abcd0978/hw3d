@@ -1,8 +1,22 @@
 #pragma once
 #include "directWin.h"
+#include "MyException.h"
 
 class Window
 {
+public:
+	class Exception : public MyException
+	{
+	public:
+		Exception(int line, const char* file, HRESULT hr) noexcept;
+		const char* what() const noexcept override;
+		virtual const char* GetType() const noexcept;
+		static std::string TraslateErrorCode(HRESULT hr) noexcept;
+		HRESULT GetErrorCode() const noexcept;
+		std::string GetErrorString() const noexcept;
+	private:
+		HRESULT hr;
+	};
 private:
 	//싱글턴
 	class WindowClass
@@ -34,3 +48,8 @@ private:
 	int height;
 	HWND hWnd;
 };
+
+//에러 throw 매크로 
+#define CHWND_EXCEPT(hr) Window::Exception(__LINE__,__FILE__,hr)
+//last에러를 throw한다.
+#define CHWND_LAST_EXCEPT() Window::Exception(__LINE__,__FILE__,GetLastError());

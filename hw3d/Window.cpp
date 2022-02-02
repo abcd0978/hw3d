@@ -46,6 +46,8 @@ Window::Window(int width, int height, const char* name) noexcept
 	wr.right = width + wr.left;
 	wr.top = 100;
 	wr.bottom = height + wr.top;
+	Window::width = width;
+	Window::height = height;
 	//RECT구조체, 윈도우 스타일 매크로, 메뉴여부-->사용안함
 	AdjustWindowRect(&wr, WS_CAPTION | WS_MINIMIZEBOX | WS_SYSMENU, FALSE);
 	//CreateWindow-->
@@ -94,14 +96,109 @@ LRESULT Window::HandleMsg(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) noe
 	switch (msg)//메세지가 들어오면
 	{
 	case WM_CLOSE://윈도우 창을 닫는 메세지가 들어온다면
-		PostQuitMessage(0);
+		PostQuitMessage(0);//끝냄
 		return 0;
+	
+
+	//keypress를 한 후 포커스가 옮겨갔을시에 KeyRelease 사인은 윈도우로 다시 안온다. 그때를 대비해 key버퍼를 지움
+	case WM_KILLFOCUS:
+		kbd.ClearState();
+		break;
+	/***************키보드 메세지******************/
+	case WM_KEYDOWN:
+	case WM_SYSKEYDOWN:
+		//사용자가 키를 꾹 누르고있을때 반복을 수행을하지 않도록 한다.
+		//AutorepeatIsEnabled가 true이면 키를 꾹 누르고있으면 반복을 수행한다.
+		if (!(lParam & 0x40000000/*KF_REPEAT*/) || kbd.AutorepeatIsEnabled() )
+		{
+			kbd.OnKeyPressed(static_cast<unsigned char>(wParam));
+		}
+		break;
+	case WM_KEYUP:
+	case WM_SYSKEYUP:
+		kbd.OnKeyReleased(static_cast<unsigned char>(wParam));
+		break;
+	case WM_CHAR:
+		kbd.OnChar(static_cast<unsigned char>(wParam));
+		break;
+	/***************키보드 메세지******************/
+
+	/******************마우스 메세지****************/
+	case WM_MOUSEMOVE:
+	{
+		const POINTS pt = MAKEPOINTS(lParam);
+		//마우스가 window의 영역 안에 들어와있다면,
+		if (pt.x >= 0 && pt.x < Window::width && pt.y >= 0 && pt.y < Window::height)
+		{
+			mouse.OnMouseMove(pt.x, pt.y);
+			if (!mouse.isInWindow())
+			{
+				SetCapture(hWnd);//이 함수로 window 바깥에서도 마우스를 잡을수 있음
+				mouse.OnMouseEnter();
+			}
+		}
+		else
+		{	//R버튼이나 L버튼을 누르는 중이였다면(드래깅 중이였다면)
+			if (wParam & (MK_LBUTTON | MK_RBUTTON))
+			{
+				mouse.OnMouseMove(pt.x, pt.y);
+			}
+			//드래깅 중이아니면 MouseLeave이벤트 호출
+			else
+			{
+				ReleaseCapture();
+				mouse.OnMouseLeave();
+			}
+		}
+		break;
+	}
+	case WM_LBUTTONDOWN:
+	{
+		const POINTS pt = MAKEPOINTS(lParam);
+		mouse.OnLeftPressed(pt.x, pt.y);
+		break;
+	}
+	case WM_LBUTTONUP:
+	{
+		const POINTS pt = MAKEPOINTS(lParam);
+		mouse.OnLeftReleased(pt.x, pt.y);
+		break;
+	}
+	case WM_RBUTTONDOWN:
+	{
+		const POINTS pt = MAKEPOINTS(lParam);
+		mouse.OnRightPressed(pt.x, pt.y);
+		break;
+	}
+	case WM_RBUTTONUP:
+	{
+		const POINTS pt = MAKEPOINTS(lParam);
+		mouse.OnRightReleased(pt.x, pt.y);
+		break;
+	}
+	case WM_MOUSEWHEEL:
+	{
+		const POINTS pt = MAKEPOINTS(lParam);
+		const int delta = GET_WHEEL_DELTA_WPARAM(wParam);
+		mouse.OnWheelDelta(pt.x, pt.y, delta);
+		break;
+	}
+
+
+
 	}
 	return DefWindowProc(hWnd, msg, wParam, lParam);
 }
 
+void Window::SetTitle(const std::string& title)
+{
+	if (SetWindowText(hWnd, title.c_str()) == 0)
+	{
+		throw CHWND_LAST_EXCEPT();
+	}
+}
 //Window Exception 클래스 
-
+//예외 throw는 "Window.h"아래에 define한 매크로로 한다.
 Window::Exception::Exception(int line, const char* file, HRESULT hr) noexcept
 	:MyException(line, file),
 	hr(hr)//hr 즉 HRESULT가 결과를 담고있다

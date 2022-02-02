@@ -1,5 +1,5 @@
 #include "Window.h"
-
+#include "App.h"
 int CALLBACK WinMain(
 	HINSTANCE hInstance,
 	HINSTANCE hPrevInstance,
@@ -9,20 +9,8 @@ int CALLBACK WinMain(
 {
 	try
 	{
-		Window wnd(500, 500, "game");
-
-		MSG msg;
-		BOOL gResult;
-		while ((gResult = GetMessage(&msg, nullptr, 0, 0)) > 0)
-		{
-			TranslateMessage(&msg);
-			DispatchMessage(&msg);
-		}
-		if (gResult == -1)
-		{
-			return -1;
-		}
-		return msg.wParam;
+		App app1;
+		app1.Go();
 	}
 	catch (const MyException& e)//앞서 정의한 예외에대해
 	{

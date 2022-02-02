@@ -24,6 +24,18 @@
     <ClCompile Include="MyException.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
+    <ClCompile Include="Keyboard.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="Mouse.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="App.h">
+      <Filter>헤더 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="App.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="directWin.h">
@@ -39,6 +51,12 @@
       <Filter>헤더 파일</Filter>
     </ClInclude>
     <ClInclude Include="Keyboard.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="Mouse.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="MyTimer.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
   </ItemGroup>

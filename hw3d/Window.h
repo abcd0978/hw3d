@@ -3,11 +3,12 @@
 #include "MyException.h"
 #include "Keyboard.h"
 #include "Mouse.h"
-
+#include <optional>
 
 class Window
 {
 public:
+	//예외처리 내부 클래스
 	class Exception : public MyException
 	{
 	public:
@@ -21,7 +22,7 @@ public:
 		HRESULT hr;
 	};
 private:
-	//싱글턴
+	//윈도우 생성클래스
 	class WindowClass
 	{
 	public:
@@ -38,11 +39,14 @@ private:
 		//window class에서 구현하는 메소드는 생성자 소멸자 getter밖에 없다
 	};
 public:
-	Window(int width, int height, const char* name) noexcept;//너비,높이 창이름
+	//너비,높이 창이름 이함수가 window를 만드는게 아니라 WindowClass내부클래스가 만드는데 그 클래스의 인스턴스를 가지고만듬
+	Window(int width, int height, const char* name) noexcept;
 	~Window();
 	Window(const Window&) = delete;
 	Window& operator=(const Window&) = delete;
 	void SetTitle(const std::string& title);
+	//optional라이브러리: 값이 있으면 값을반환, 없으면 빈 optional객체 반환.
+	static std::optional<int> ProcessMessages();
 private:
 	static LRESULT CALLBACK HandleMsgSetup(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 	static LRESULT CALLBACK HandleMsgThunk(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);

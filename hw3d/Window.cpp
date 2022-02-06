@@ -254,3 +254,24 @@ std::string Window::Exception::GetErrorString() const noexcept
 {
 	return TraslateErrorCode(Exception::hr);//여기서 Translate된 HRESULT를 반환하고, what에서 이를 출력한다.
 }
+
+std::optional<int> Window::ProcessMessages()
+{
+	MSG msg;
+	//큐에 메세지가 남아있을때, dequeue한다.
+	//Peekmessage()는 GetMessage()와 다르게 무한정 대기하지않는다.
+	//
+	while (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE))
+	{
+		//quit메세지(프로그램종료)를 체크한다.
+		if (msg.message == WM_QUIT)
+		{
+			//quit이면 wParam을 리턴한다.
+			return msg.wParam;
+		}
+		TranslateMessage(&msg);
+		DispatchMessageA(&msg);
+	}
+	//만약 message가 없다면 빈 optional을 리턴한다.
+	return {};
+}

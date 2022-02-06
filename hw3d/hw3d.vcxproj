@@ -152,6 +152,7 @@
     <ClCompile Include="Keyboard.cpp" />
     <ClCompile Include="Mouse.cpp" />
     <ClCompile Include="MyException.cpp" />
+    <ClCompile Include="MyTimer.cpp" />
     <ClCompile Include="Window.cpp" />
     <ClCompile Include="winmain.cpp" />
   </ItemGroup>
